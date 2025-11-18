@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محلل ألوان الويب كام</title>
+    <style>
+        /* CSS */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f4f9;
+            margin: 20px;
+        }
+
+        #video-container {
+            border: 2px solid #333;
+            margin-bottom: 20px;
+            background-color: #000;
+        }
+
+        #videoElement {
+            width: 100%;
+            max-width: 600px;
+            display: block;
+        }
+
+        #canvas, #color-display {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            max-width: 600px;
+            margin: 10px 0;
+            cursor: crosshair; /* تغيير المؤشر للدلالة على إمكانية الاختيار */
+        }
+        
+        #color-display {
+            height: 50px;
+            width: 200px;
+            border-radius: 5px;
+            text-align: center;
+            line-height: 50px;
+            font-weight: bold;
+            color: #333;
+            transition: background-color 0.3s;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #instructions {
+            margin-top: 15px;
+            padding: 10px;
+            border-left: 5px solid #007bff;
+            background-color: #e9f7ff;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>📷 محلل ألوان الويب كام</h2>
+
+    <div id="video-container">
+        <video id="videoElement" autoplay playsinline></video>
+    </div>
+
+    <button id="captureButton" disabled>التقط الصورة</button>
+
+    <canvas id="canvas" style="display: none;"></canvas>
+
+    <div id="instructions">
+        **الخطوات:** 1. اسمح بالوصول للكاميرا. 2. التقط الصورة. 3. اضغط على أي نقطة في الصورة الملتقطة لتحليل لونها.
+    </div>
+    <div id="color-display">اضغط على الصورة لتحليل اللون</div>
+
+    <script>
+        // JavaScript
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const captureButton = document.getElementById('captureButton');
+        const colorDisplay = document.getElementById('color-display');
+
+        // متغير لتخزين مصدر الفيديو
+        let stream;
+
+        // 1. تشغيل الكاميرا 🚀
+        async function startCamera() {
+            try {
+                // طلب الوصول إلى وسائط الفيديو (الكاميرا)
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                // تفعيل زر الالتقاط بمجرد بدء تشغيل الفيديو
+                video.onloadedmetadata = () => {
+                    video.play();
+                    captureButton.disabled = false;
+                    captureButton.textContent = 'التقط الصورة';
+                };
+            } catch (err) {
+                console.error("خطأ في الوصول إلى الكاميرا: ", err);
+                alert("لم يتمكن المتصفح من الوصول إلى الكاميرا. تأكد من الأذونات.");
+            }
+        }
+
+        // 2. التقاط الصورة 📸
+        function captureImage() {
+            // تحديد أبعاد الـ canvas لتطابق أبعاد الفيديو
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // رسم إطار الفيديو الحالي على الـ Canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // إيقاف بث الفيديو وعرض الـ Canvas
+            stream.getTracks().forEach(track => track.stop()); // إيقاف الكاميرا
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            captureButton.style.display = 'none';
+            colorDisplay.textContent = "التقطت! اضغط على أي نقطة للحصول على اللون.";
+        }
+        
+        captureButton.addEventListener('click', captureImage);
+        
+        // 3. تحليل اللون عند الضغط على الـ Canvas (الصورة الملتقطة) 🎨
+        canvas.addEventListener('click', function(event) {
+            // الحصول على إحداثيات الضغط داخل عنصر الـ Canvas
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // استخدام دالة getImageData للحصول على بيانات البكسل في النقطة (x, y)
+            // 
+            const pixelData = context.getImageData(x, y, 1, 1).data;
+            
+            // البيانات تكون على شكل مصفوفة [Red, Green, Blue, Alpha]
+            const r = pixelData[0];
+            const g = pixelData[1];
+            const b = pixelData[2];
+            
+            // تحويل قيمة الألوان إلى تنسيق سداسي عشري (Hex)
+            const hexColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+            const rgbColor = `RGB(${r}, ${g}, ${b})`;
+
+            // عرض اللون
+            colorDisplay.style.backgroundColor = hexColor;
+            colorDisplay.style.color = (r * 0.299 + g * 0.587 + b * 0.114) > 186 ? '#000' : '#fff'; // تغيير لون النص ليناسب الخلفية
+            colorDisplay.innerHTML = `${hexColor}<br>${rgbColor}`;
+
+            console.log(`تم اختيار النقطة (${Math.floor(x)}, ${Math.floor(y)}) اللون: ${hexColor} (${rgbColor})`);
+        });
+
+        // تشغيل الكاميرا تلقائياً عند تحميل الصفحة
+        window.onload = startCamera;
+    </script>
+
+</body>
+</html>
